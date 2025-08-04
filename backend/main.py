@@ -1,5 +1,4 @@
 import os
-import re
 import time
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
@@ -8,7 +7,6 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import praw
 from concurrent.futures import ThreadPoolExecutor
 from prawcore.exceptions import ServerError, ResponseException
-
 
 # Load environment variables from .env file
 load_dotenv()
@@ -53,10 +51,9 @@ def analyze_sentiment(text: str) -> float:
 
 def is_valid_reddit_url(url: str) -> bool:
     """
-    Validate the URL format to ensure it points to a Reddit submission.
+    Relaxed validation: only check if it contains 'reddit.com/r/'
     """
-    pattern = r"^https?://(www\.)?reddit\.com/r/[\w_]+/comments/[\w\d]+/?.*$"
-    return re.match(pattern, url) is not None
+    return "reddit.com/r/" in url
 
 def fetch_submission_with_retry(url: str, retries: int = 3, delay: int = 5):
     for attempt in range(retries):
@@ -86,7 +83,7 @@ def analyze_reddit_post(
     Analyzes sentiment of a Reddit post and its top-level comments.
     Returns JSON with post info and comments including sentiment scores.
     """
-    # Validate URL input
+    # Validate URL input with relaxed validation
     if not is_valid_reddit_url(url):
         raise HTTPException(status_code=400, detail="Invalid Reddit post URL format")
 

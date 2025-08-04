@@ -35,9 +35,18 @@ export default function Home() {
     setError(null);
     setData(null);
 
+    const trimmedUrl = url.trim();
+
+    // Simple check to see if it looks like a Reddit post URL
+    if (!trimmedUrl.includes("reddit.com/r/")) {
+      setError("Please enter a valid Reddit post URL");
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch(
-        `/api/analyze_post?url=${encodeURIComponent(url)}&max_comments=${maxComments}`
+        `/api/analyze_post?url=${encodeURIComponent(trimmedUrl)}&max_comments=${maxComments}`
       );
       if (!res.ok) {
         const err = await res.json();
