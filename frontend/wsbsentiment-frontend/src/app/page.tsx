@@ -59,8 +59,12 @@ export default function Home() {
       }
       const json: PostData = await res.json();
       setData(json);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        setError(e.message);
+      } else {
+        setError(String(e));
+      }
     } finally {
       setLoading(false);
     }
