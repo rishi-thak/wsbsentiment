@@ -7,12 +7,12 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 import praw
 from concurrent.futures import ThreadPoolExecutor
 from prawcore.exceptions import ServerError, ResponseException
+import re
 
 load_dotenv()
 
 app = FastAPI()
 
-# Allow frontend localhost CORS access (adjust origins in production!)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -34,7 +34,6 @@ reddit = praw.Reddit(
     user_agent=REDDIT_USER_AGENT,
 )
 
-# Load your custom lexicon file with phrases using underscores for multi-word
 def load_custom_lexicon(file_path: str) -> dict:
     lex = {}
     with open(file_path, "r", encoding="utf-8") as f:
@@ -45,28 +44,24 @@ def load_custom_lexicon(file_path: str) -> dict:
             parts = line.split()
             if len(parts) < 2:
                 continue
-            # The last part is the score, the rest is the token (handles tokens with spaces)
             score = float(parts[-1])
-            token = "_".join(parts[:-1]).lower()  # join multi-word tokens with underscores
+            token = "_".join(parts[:-1]).lower()
             lex[token] = score
     return lex
 
-# Path to your custom lexicon txt file (adjust if needed)
 LEXICON_PATH = "custom_lexicon.txt"
 custom_lexicon = load_custom_lexicon(LEXICON_PATH)
 
 analyzer = SentimentIntensityAnalyzer()
-analyzer.lexicon = custom_lexicon  # replace VADER's default lexicon with yours
+analyzer.lexicon = custom_lexicon
 
-# List of multi-word phrases from your lexicon to preprocess in input text
 multi_word_phrases = [k for k in custom_lexicon if "_" in k]
 
 def preprocess_text(text: str) -> str:
     text = text.lower()
     for phrase in multi_word_phrases:
-        # Replace underscores with spaces for searching
-        phrase_spaced = phrase.replace("_", " ")
-        text = text.replace(phrase_spaced, phrase)
+        spaced = phrase.replace("_", " ")
+        text = text.replace(spaced, phrase)
     return text
 
 def analyze_sentiment(text: str) -> float:
@@ -79,7 +74,7 @@ def fetch_submission_with_retry(url: str, retries=3, delay=5):
     for attempt in range(retries):
         try:
             submission = reddit.submission(url=url)
-            _ = submission.id  # force fetch
+            _ = submission.id
             return submission
         except (ServerError, ResponseException) as e:
             if hasattr(e, "response") and e.response.status_code == 429:
@@ -90,6 +85,18 @@ def fetch_submission_with_retry(url: str, retries=3, delay=5):
             raise HTTPException(status_code=400, detail=str(e))
     raise HTTPException(status_code=429, detail="Rate limit exceeded, try later")
 
+def is_valid_comment(comment) -> bool:
+    # Filter out comments with author containing 'mod' or 'bot' (case-insensitive)
+    if comment.author is None:
+        return False
+    author = str(comment.author)
+    if re.search(r"mod|bot", author, re.IGNORECASE):
+        return False
+    # Filter out deleted or removed comments
+    if comment.body in ("[deleted]", "[removed]"):
+        return False
+    return True
+
 @app.get("/analyze_post")
 def analyze_reddit_post(
     url: str = Query(..., description="Full Reddit post URL"),
@@ -99,29 +106,43 @@ def analyze_reddit_post(
         raise HTTPException(status_code=400, detail="Invalid Reddit URL")
 
     submission = fetch_submission_with_retry(url)
-
     submission.comments.replace_more(limit=0)
-    top_level_comments = [c for c in submission.comments if isinstance(c, praw.models.Comment)]
-    top_level_comments = top_level_comments[:max_comments]
+
+    all_comments = [c for c in submission.comments if isinstance(c, praw.models.Comment)]
+    # Apply filtering here first
+    filtered_comments = [c for c in all_comments if is_valid_comment(c)]
+    selected_comments = filtered_comments[:max_comments]
 
     def analyze_comment(comment):
+        sentiment = analyze_sentiment(comment.body)
         return {
             "id": comment.id,
             "body": comment.body,
-            "sentiment": analyze_sentiment(comment.body),
+            "sentiment": sentiment,
             "score": comment.score,
             "author": str(comment.author),
             "created_utc": comment.created_utc,
         }
 
     with ThreadPoolExecutor(max_workers=10) as executor:
-        comments_data = list(executor.map(analyze_comment, top_level_comments))
+        comment_data = list(executor.map(analyze_comment, selected_comments))
 
-    # Calculate overall sentiment as average of comment sentiments
-    if comments_data:
-        overall_sentiment = sum(c["sentiment"] for c in comments_data) / len(comments_data)
-    else:
+    if not comment_data:
         overall_sentiment = 0.0
+    else:
+        weighted_comments = [c for c in comment_data if c["sentiment"] != 0.0]
+        zero_comments = [c for c in comment_data if c["sentiment"] == 0.0]
+
+        if len(zero_comments) > len(weighted_comments):
+            zero_subset = zero_comments[:len(weighted_comments)]
+        else:
+            zero_subset = zero_comments
+
+        final_set = weighted_comments + zero_subset
+        if final_set:
+            overall_sentiment = sum(c["sentiment"] for c in final_set) / len(final_set)
+        else:
+            overall_sentiment = 0.0
 
     return {
         "id": submission.id,
@@ -130,7 +151,7 @@ def analyze_reddit_post(
         "sentiment": overall_sentiment,
         "score": submission.score,
         "url": submission.url,
-        "num_comments": submission.num_comments,
+        "num_comments": len(comment_data),  # matches the filtered analyzed comments count
         "created_utc": submission.created_utc,
-        "top_comments": comments_data,
+        "top_comments": comment_data,
     }

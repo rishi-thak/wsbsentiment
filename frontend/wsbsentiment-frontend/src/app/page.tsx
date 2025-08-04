@@ -47,7 +47,6 @@ export default function Home() {
     }
 
     try {
-      // IMPORTANT: Call your FastAPI backend directly here
       const res = await fetch(
         `http://localhost:8000/analyze_post?url=${encodeURIComponent(
           url
@@ -84,10 +83,7 @@ export default function Home() {
         className="space-y-6"
       >
         <div>
-          <Label
-            htmlFor="url"
-            className="mb-1 block font-semibold text-gray-300"
-          >
+          <Label htmlFor="url" className="mb-1 block font-semibold text-gray-300">
             Reddit Post URL
           </Label>
           <Input
