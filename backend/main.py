@@ -49,17 +49,11 @@ def analyze_sentiment(text: str) -> float:
     scores = analyzer.polarity_scores(text)
     return scores["compound"]
 
-def is_valid_reddit_url(url: str) -> bool:
-    """
-    Relaxed validation: only check if it contains 'reddit.com/r/'
-    """
-    return "reddit.com/r/" in url
-
 def fetch_submission_with_retry(url: str, retries: int = 3, delay: int = 5):
     for attempt in range(retries):
         try:
             submission = reddit.submission(url=url)
-            _ = submission.id
+            _ = submission.id  # Access id to trigger fetching and validation
             return submission
         except (ServerError, ResponseException) as e:
             # Check if it's a rate limit (HTTP 429)
@@ -73,7 +67,6 @@ def fetch_submission_with_retry(url: str, retries: int = 3, delay: int = 5):
 
     raise HTTPException(status_code=429, detail="Rate limit exceeded. Please try again later.")
 
-
 @app.get("/analyze_post")
 def analyze_reddit_post(
     url: str = Query(..., description="Full Reddit post URL to analyze"),
@@ -83,9 +76,9 @@ def analyze_reddit_post(
     Analyzes sentiment of a Reddit post and its top-level comments.
     Returns JSON with post info and comments including sentiment scores.
     """
-    # Validate URL input with relaxed validation
-    if not is_valid_reddit_url(url):
-        raise HTTPException(status_code=400, detail="Invalid Reddit post URL format")
+    # Relaxed URL validation
+    if "reddit.com" not in url.lower():
+        raise HTTPException(status_code=400, detail="Invalid Reddit post URL")
 
     # Fetch Reddit submission with retry logic on rate limits
     submission = fetch_submission_with_retry(url)

@@ -35,10 +35,8 @@ export default function Home() {
     setError(null);
     setData(null);
 
-    const trimmedUrl = url.trim();
-
-    // Simple check to see if it looks like a Reddit post URL
-    if (!trimmedUrl.includes("reddit.com/r/")) {
+    // Simplified validation: just check it includes reddit.com
+    if (!url.includes("reddit.com")) {
       setError("Please enter a valid Reddit post URL");
       setLoading(false);
       return;
@@ -46,7 +44,7 @@ export default function Home() {
 
     try {
       const res = await fetch(
-        `/api/analyze_post?url=${encodeURIComponent(trimmedUrl)}&max_comments=${maxComments}`
+        `/api/analyze_post?url=${encodeURIComponent(url)}&max_comments=${maxComments}`
       );
       if (!res.ok) {
         const err = await res.json();
@@ -66,7 +64,7 @@ export default function Home() {
       <h1 className="text-3xl font-bold mb-6">WSB Reddit Sentiment Analyzer</h1>
 
       <div className="mb-4">
-        <label className="block font-semibold mb-1" htmlFor="url">
+        <label htmlFor="url" className="block font-semibold mb-1">
           Reddit Post URL
         </label>
         <input
@@ -80,7 +78,7 @@ export default function Home() {
       </div>
 
       <div className="mb-4">
-        <label className="block font-semibold mb-1" htmlFor="maxComments">
+        <label htmlFor="maxComments" className="block font-semibold mb-1">
           Max Comments to Analyze
         </label>
         <input
