@@ -34,12 +34,46 @@ reddit = praw.Reddit(
     user_agent=REDDIT_USER_AGENT,
 )
 
+# Load your custom lexicon file with phrases using underscores for multi-word
+def load_custom_lexicon(file_path: str) -> dict:
+    lex = {}
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            # The last part is the score, the rest is the token (handles tokens with spaces)
+            score = float(parts[-1])
+            token = "_".join(parts[:-1]).lower()  # join multi-word tokens with underscores
+            lex[token] = score
+    return lex
+
+# Path to your custom lexicon txt file (adjust if needed)
+LEXICON_PATH = "custom_lexicon.txt"
+custom_lexicon = load_custom_lexicon(LEXICON_PATH)
+
 analyzer = SentimentIntensityAnalyzer()
+analyzer.lexicon = custom_lexicon  # replace VADER's default lexicon with yours
+
+# List of multi-word phrases from your lexicon to preprocess in input text
+multi_word_phrases = [k for k in custom_lexicon if "_" in k]
+
+def preprocess_text(text: str) -> str:
+    text = text.lower()
+    for phrase in multi_word_phrases:
+        # Replace underscores with spaces for searching
+        phrase_spaced = phrase.replace("_", " ")
+        text = text.replace(phrase_spaced, phrase)
+    return text
 
 def analyze_sentiment(text: str) -> float:
     if not text.strip():
         return 0.0
-    return analyzer.polarity_scores(text)["compound"]
+    processed_text = preprocess_text(text)
+    return analyzer.polarity_scores(processed_text)["compound"]
 
 def fetch_submission_with_retry(url: str, retries=3, delay=5):
     for attempt in range(retries):
@@ -66,9 +100,6 @@ def analyze_reddit_post(
 
     submission = fetch_submission_with_retry(url)
 
-    submission_text = f"{submission.title} {submission.selftext}"
-    post_sentiment = analyze_sentiment(submission_text)
-
     submission.comments.replace_more(limit=0)
     top_level_comments = [c for c in submission.comments if isinstance(c, praw.models.Comment)]
     top_level_comments = top_level_comments[:max_comments]
@@ -86,11 +117,17 @@ def analyze_reddit_post(
     with ThreadPoolExecutor(max_workers=10) as executor:
         comments_data = list(executor.map(analyze_comment, top_level_comments))
 
+    # Calculate overall sentiment as average of comment sentiments
+    if comments_data:
+        overall_sentiment = sum(c["sentiment"] for c in comments_data) / len(comments_data)
+    else:
+        overall_sentiment = 0.0
+
     return {
         "id": submission.id,
         "title": submission.title,
         "selftext": submission.selftext,
-        "sentiment": post_sentiment,
+        "sentiment": overall_sentiment,
         "score": submission.score,
         "url": submission.url,
         "num_comments": submission.num_comments,
