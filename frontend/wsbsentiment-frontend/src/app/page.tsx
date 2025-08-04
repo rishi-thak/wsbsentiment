@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 type Comment = {
   id: string;
@@ -35,7 +36,6 @@ export default function Home() {
     setError(null);
     setData(null);
 
-    // Simplified validation: just check it includes reddit.com
     if (!url.includes("reddit.com")) {
       setError("Please enter a valid Reddit post URL");
       setLoading(false);
@@ -109,29 +109,37 @@ export default function Home() {
             Score: {data.score} | Comments: {data.num_comments} | Sentiment:{" "}
             {data.sentiment.toFixed(3)}
           </p>
-          <p className="mb-4 whitespace-pre-wrap">{data.selftext || "(No text)"}</p>
+          <div className="mb-4 prose max-w-none whitespace-pre-wrap">
+            <ReactMarkdown>{data.selftext || "(No text)"}</ReactMarkdown>
+          </div>
 
           <h3 className="text-xl font-semibold mb-2">Top Comments</h3>
           <ul className="space-y-4 max-h-[400px] overflow-y-auto">
-            {data.top_comments.map((comment) => (
-              <li
-                key={comment.id}
-                className={`p-3 rounded border ${
-                  comment.sentiment > 0.1
-                    ? "bg-green-100 border-green-300"
-                    : comment.sentiment < -0.1
-                    ? "bg-red-100 border-red-300"
-                    : "bg-gray-100 border-gray-300"
-                }`}
-              >
-                <p className="mb-1 text-sm text-gray-700">{comment.body}</p>
-                <div className="text-xs text-gray-500 flex justify-between">
-                  <span>Sentiment: {comment.sentiment.toFixed(3)}</span>
-                  <span>Score: {comment.score}</span>
-                  <span>By: {comment.author}</span>
-                </div>
-              </li>
-            ))}
+            {data.top_comments.map((comment) => {
+              if (comment.body === "[deleted]" || comment.body === "[removed]") {
+                return null; // skip deleted/removed comments
+              }
+              return (
+                <li
+                  key={comment.id}
+                  className={`p-3 rounded border ${
+                    comment.sentiment > 0.1
+                      ? "bg-green-100 border-green-300"
+                      : comment.sentiment < -0.1
+                      ? "bg-red-100 border-red-300"
+                      : "bg-gray-100 border-gray-300"
+                  }`}
+                >
+                  <ReactMarkdown>{comment.body}</ReactMarkdown>
+                  <div className="text-xs text-gray-500 flex justify-between mt-2">
+                    <span>Sentiment: {comment.sentiment.toFixed(3)}</span>
+                    <span>Score: {comment.score}</span>
+                    <span>By: {comment.author}</span>
+                    <span>{new Date(comment.created_utc * 1000).toLocaleString()}</span>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}
