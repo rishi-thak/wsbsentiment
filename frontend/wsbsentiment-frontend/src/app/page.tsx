@@ -71,19 +71,24 @@ export default function Home() {
 
   return (
     <main className="max-w-3xl mx-auto p-6">
-      <h1 className="text-4xl font-extrabold mb-8 text-sky-600 dark:text-sky-400">
-        WSB Reddit Sentiment Analyzer
-      </h1>
+      <div className="text-center mb-8">
+        <h1 className="text-4xl font-extrabold text-sky-600 dark:text-sky-400">
+          WSB Reddit Sentiment Analyzer
+        </h1>
+      </div>
 
       <form
         onSubmit={(e) => {
           e.preventDefault();
           fetchSentiment();
         }}
-        className="space-y-6"
+        className="space-y-6 max-w-md mx-auto text-center"
       >
         <div>
-          <Label htmlFor="url" className="mb-1 block font-semibold text-gray-300">
+          <Label
+            htmlFor="url"
+            className="mb-1 block font-semibold text-gray-300"
+          >
             Reddit Post URL
           </Label>
           <Input
@@ -92,7 +97,7 @@ export default function Home() {
             placeholder="https://www.reddit.com/r/wallstreetbets/comments/abc123/..."
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            className="bg-gray-900 border-sky-600 focus:ring-sky-500"
+            className="bg-gray-900 border-sky-600 focus:ring-2 focus:ring-sky-500 focus:ring-offset-1 focus:ring-offset-gray-900 mx-auto max-w-lg text-center rounded-md transition-shadow"
             required
           />
         </div>
@@ -111,7 +116,7 @@ export default function Home() {
             max={500}
             value={maxComments}
             onChange={(e) => setMaxComments(Number(e.target.value))}
-            className="w-28 bg-gray-900 border-sky-600 focus:ring-sky-500"
+            className="w-28 bg-gray-900 border-sky-600 focus:ring-2 focus:ring-sky-500 focus:ring-offset-1 focus:ring-offset-gray-900 mx-auto text-center rounded-md transition-shadow"
             required
           />
         </div>
@@ -119,36 +124,45 @@ export default function Home() {
         <Button
           type="submit"
           disabled={loading || !url}
-          className="bg-sky-600 hover:bg-sky-700 disabled:opacity-50 w-full"
+          className="w-36 mx-auto bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-indigo-600 hover:to-sky-600 disabled:opacity-50 text-white font-semibold shadow-lg shadow-sky-700 transition-transform active:scale-95 focus:ring-4 focus:ring-sky-400 focus:ring-offset-2 focus:ring-offset-gray-900 rounded-md"
         >
           {loading ? "Analyzing..." : "Analyze"}
         </Button>
       </form>
 
       {error && (
-        <p className="mt-6 text-red-500 font-medium" role="alert">
+        <p className="mt-6 text-red-500 font-medium text-center" role="alert">
           {error}
         </p>
       )}
 
       {data && (
         <section className="mt-10">
-          <h2 className="text-3xl font-bold text-sky-500 mb-2">{data.title}</h2>
-          <p className="text-sm text-gray-400 mb-4">
-            Score: <span className="font-semibold">{data.score}</span> | Comments:{" "}
+          <div className="text-center mb-2">
+            <h2 className="text-3xl font-bold text-sky-500">{data.title}</h2>
+          </div>
+          <p className="text-sm text-gray-400 mb-4 text-center max-w-md mx-auto">
+            Post Score:{" "}
+            <span
+              title="Upvotes minus downvotes on the original Reddit post"
+              className="font-semibold"
+            >
+              {data.score}
+            </span>{" "}
+            | Comments Analyzed:{" "}
             <span className="font-semibold">{data.num_comments}</span> | Sentiment:{" "}
             <span className="font-semibold">{data.sentiment.toFixed(3)}</span>
           </p>
 
-          <Card className="mb-8 bg-gray-900 border border-sky-700 p-5">
-            <p className="whitespace-pre-wrap text-gray-300">
-              {data.selftext || "(No text)"}
-            </p>
+          <Card className="mb-8 bg-gray-900 border border-sky-700 p-5 max-w-md mx-auto shadow-md shadow-sky-800 rounded-lg">
+            <p className="whitespace-pre-wrap text-gray-300">{data.selftext || "(No text)"}</p>
           </Card>
 
-          <h3 className="text-2xl font-semibold text-sky-400 mb-4">Top Comments</h3>
+          <div className="text-center mb-4">
+            <h3 className="text-2xl font-semibold text-sky-400">Top Comments</h3>
+          </div>
 
-          <ScrollArea className="max-h-[400px] rounded border border-sky-700 bg-gray-900 p-4">
+          <ScrollArea className="max-h-[400px] rounded border border-sky-700 bg-gray-900 p-4 max-w-md mx-auto shadow-inner shadow-sky-800">
             <ul className="space-y-5">
               {data.top_comments.map((comment) => {
                 if (/mod|bot/i.test(comment.author)) return null;
@@ -169,8 +183,12 @@ export default function Home() {
                   >
                     <p className="mb-2">{comment.body}</p>
                     <div className="text-xs flex flex-wrap justify-between text-gray-400 gap-2">
-                      <span>Sentiment: {comment.sentiment.toFixed(3)}</span>
-                      <span>Score: {comment.score}</span>
+                      <span title="Sentiment score from -1 (negative) to 1 (positive)">
+                        Sentiment: {comment.sentiment.toFixed(3)}
+                      </span>
+                      <span title="Upvotes minus downvotes on this comment">
+                        Comment Score: {comment.score}
+                      </span>
                       <span>By: {comment.author}</span>
                       <span>{new Date(comment.created_utc * 1000).toLocaleString()}</span>
                     </div>
